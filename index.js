@@ -24,9 +24,9 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 
 async function run() {
     try {
-        const serviceCollection = client.db('Assignment11').collection('treatments');
-        const reviewCollection = client.db('Assignment11').collection('review');
-        const userCollection = client.db('Assignment12').collection('users');
+        const carCollection = client.db('your-car').collection('products');
+        const reviewCollection = client.db('your-car').collection('review');
+        const userCollection = client.db('your-car').collection('users');
         console.log('mongo db connect');
 
         function jwtVerification(req, res, next) {
@@ -64,18 +64,24 @@ async function run() {
             res.send({ token });
         });
 
+
+        app.post('/add-product', async (req, res) => {
+            const product = req.body;
+            const result = await carCollection.insertOne(product);
+            res.send(result);
+        })
         app.get('/services', async (req, res) => {
             const query = parseInt(req.query.limit);
-            const data = serviceCollection.find({}).limit(query).sort({ _id: -1 });
+            const data = carCollection.find({}).limit(query).sort({ _id: -1 });
             const services = await data.toArray();
             res.send(services);
         });
         app.get('/services/pagination', async (req, res) => {
             const limit = parseInt(req.query.limit);
             const page = parseInt(req.query.page);
-            const allData = await serviceCollection.find({}).toArray();
+            const allData = await carCollection.find({}).toArray();
             const length = allData.length;
-            const data = serviceCollection.find({}).skip(page * limit).limit(limit).sort({ _id: -1 });
+            const data = carCollection.find({}).skip(page * limit).limit(limit).sort({ _id: -1 });
             const services = await data.toArray();
             res.send({ services, length });
         });
@@ -84,8 +90,8 @@ async function run() {
             const page = parseInt(req.query.page);
             const search = req.query.search;
             const query = { $or: [{ description1: { $regex: search, $options: 'i' } }, { title: { $regex: search, $options: 'i' } }] };
-            const data = serviceCollection.find(query).skip(page * limit).limit(limit).sort({ _id: -1 });
-            const dataForLength = await serviceCollection.find(query).toArray();
+            const data = carCollection.find(query).skip(page * limit).limit(limit).sort({ _id: -1 });
+            const dataForLength = await carCollection.find(query).toArray();
             const services = await data.toArray();
             const length = dataForLength.length;
             res.send({ services, length });
@@ -94,7 +100,7 @@ async function run() {
         app.get('/services/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: ObjectId(id) };
-            const service = await serviceCollection.findOne(query);
+            const service = await carCollection.findOne(query);
             res.send(service);
         })
 
@@ -142,12 +148,7 @@ async function run() {
             const result = await reviewCollection.updateOne(filter, updatedUser, option);
             res.send(result);
         })
-        app.post('/add-service', async (req, res) => {
-            const service = req.body;
-            const result = await serviceCollection.insertOne(service);
-            console.log(result)
-            res.send(result);
-        })
+
         app.post('/payment-intents', async (req, res) => {
             const price = parseFloat(req.body.price) * 100;
             const paymentIntent = await stripe.paymentIntents.create({
@@ -163,27 +164,24 @@ async function run() {
         })
         app.post('/login', async (req, res) => {
             const user = req.body?.user;
+            console.log(user)
             const query = { uid: user?.uid }
             const isExist = await userCollection.findOne(query);
             if (isExist) {
                 return res.send('user already exists');
             }
             else {
-
-                const userField = {
-                    name: user?.displayName,
-                    uid: user?.uid,
-                    email: user?.email,
-                    image: user?.photoURL,
-                    role: 'user'
-                };
-                const result = await userCollection.insertOne(userField);
+                const result = await userCollection.insertOne(user);
                 res.send(result);
             }
         })
-        app.post('/trial', (req, res) => {
-            console.log(req.headers)
-        })
+        app.get('/user/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { uid: id }
+            const result = await userCollection.findOne(query);
+            console.log(result)
+            res.send(result);
+        });
     } finally {
 
     }
