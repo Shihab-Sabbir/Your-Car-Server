@@ -36,6 +36,7 @@ async function run() {
         const carCollection = client.db('your-car').collection('products');
         const reviewCollection = client.db('your-car').collection('review');
         const userCollection = client.db('your-car').collection('users');
+        const orderCollection = client.db('your-car').collection('order');
         console.log('mongo db connect');
 
         function jwtVerification(req, res, next) {
@@ -118,14 +119,13 @@ async function run() {
             const length = dataForLength.length;
             res.send({ services, length });
         });
-
-
-
-        app.post('/review', async (req, res) => {
-            const review = req.body;
-            const result = await reviewCollection.insertOne(review)
+        app.post('/order', async (req, res) => {
+            const order = req.body;
+            const result = await orderCollection.insertOne(order)
             res.send(result);
         });
+
+
 
         app.get('/review/:id', async (req, res) => {
             const id = req.params.id;
@@ -202,7 +202,6 @@ async function run() {
             const role = req.query.role;
             const query = { role: role }
             const result = await userCollection.find(query).toArray();
-            console.log(role)
             res.send(result);
         });
     } finally {
