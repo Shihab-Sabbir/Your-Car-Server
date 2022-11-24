@@ -38,6 +38,7 @@ async function run() {
         const userCollection = client.db('your-car').collection('users');
         const orderCollection = client.db('your-car').collection('order');
         const wishlistCollection = client.db('your-car').collection('wishlist');
+
         console.log('mongo db connect');
 
         function jwtVerification(req, res, next) {
@@ -126,12 +127,36 @@ async function run() {
             console.log(query)
             res.send(data);
         });
+        app.post('/advertise/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id), add: true }
+            const query = { _id: ObjectId(id) }
+            const add = await carCollection.findOne(filter);
+            console.log(id, filter, add, query)
+            if (add) {
+                const updateProduct = {
+                    $set: {
+                        add: false
+                    }
+                }
+                const result = await carCollection.updateOne(query, updateProduct, { upsert: false });
+                res.send('Remove from advertisement');
+            }
+            else {
+                const updateProduct = {
+                    $set: {
+                        add: true
+                    }
+                }
+                const result = await carCollection.updateOne(query, updateProduct, { upsert: false });
+                res.send('Added to advertisement');
+            }
+        });
         app.post('/verify-seller/:id', async (req, res) => {
             const id = req.params.id;
             const filter = { uid: id, verify: true }
             const query = { uid: id }
             const seller = await userCollection.findOne(filter);
-            console.log(id,filter,seller,query)
             if (seller) {
                 const updateSeller = {
                     $set: {
