@@ -96,28 +96,10 @@ async function run() {
             const products = await carCollection.find(query).toArray();
             res.send(products);
         })
-
-
-
-        app.get('/services/pagination', async (req, res) => {
-            const limit = parseInt(req.query.limit);
-            const page = parseInt(req.query.page);
-            const allData = await carCollection.find({}).toArray();
-            const length = allData.length;
-            const data = carCollection.find({}).skip(page * limit).limit(limit).sort({ _id: -1 });
-            const services = await data.toArray();
-            res.send({ services, length });
-        });
-        app.get('/search', async (req, res) => {
-            const limit = parseInt(req.query.limit);
-            const page = parseInt(req.query.page);
-            const search = req.query.search;
-            const query = { $or: [{ description1: { $regex: search, $options: 'i' } }, { title: { $regex: search, $options: 'i' } }] };
-            const data = carCollection.find(query).skip(page * limit).limit(limit).sort({ _id: -1 });
-            const dataForLength = await carCollection.find(query).toArray();
-            const services = await data.toArray();
-            const length = dataForLength.length;
-            res.send({ services, length });
+        app.get('/my-orders/:id', async (req, res) => {
+            const query = { uid: req.params.id };
+            const data = await orderCollection.find(query).toArray();
+            res.send(data);
         });
         app.post('/order', async (req, res) => {
             const order = req.body;
@@ -126,58 +108,91 @@ async function run() {
         });
 
 
+        // app.get('/services/pagination', async (req, res) => {
+        //     const limit = parseInt(req.query.limit);
+        //     const page = parseInt(req.query.page);
+        //     const allData = await carCollection.find({}).toArray();
+        //     const length = allData.length;
+        //     const data = carCollection.find({}).skip(page * limit).limit(limit).sort({ _id: -1 });
+        //     const services = await data.toArray();
+        //     res.send({ services, length });
+        // });
+        // app.get('/search', async (req, res) => {
+        //     const limit = parseInt(req.query.limit);
+        //     const page = parseInt(req.query.page);
+        //     const search = req.query.search;
+        //     const query = { $or: [{ description1: { $regex: search, $options: 'i' } }, { title: { $regex: search, $options: 'i' } }] };
+        //     const data = carCollection.find(query).skip(page * limit).limit(limit).sort({ _id: -1 });
+        //     const dataForLength = await carCollection.find(query).toArray();
+        //     const services = await data.toArray();
+        //     const length = dataForLength.length;
+        //     res.send({ services, length });
+        // });
 
-        app.get('/review/:id', async (req, res) => {
-            const id = req.params.id;
-            const query = { serviceId: id }
-            const result = await reviewCollection.find(query).sort({ time: -1 }).toArray();
-            res.send(result);
-        });
 
-        app.get('/review/user/:id', jwtVerification, async (req, res) => {
-            const decoded = req.decoded;
-            const id = req.params.id;
-            if (decoded.uid !== id) {
-                return res.status(403).send({ message: 'Forbidden access !' })
-            }
-            const query = { user: id };
-            const result = await reviewCollection.find(query).sort({ time: -1 }).toArray();
-            res.send(result);
-        });
 
-        app.delete('/review/:id', async (req, res) => {
-            const id = req.params.id;
-            const query = { _id: ObjectId(id) }
-            const result = await reviewCollection.deleteOne(query);
-            res.send(result);
-        });
+        // app.get('/review/:id', async (req, res) => {
+        //     const id = req.params.id;
+        //     const query = { serviceId: id }
+        //     const result = await reviewCollection.find(query).sort({ time: -1 }).toArray();
+        //     res.send(result);
+        // });
 
-        app.put('/review/:id', async (req, res) => {
-            const id = req.params.id;
-            const filter = { _id: ObjectId(id) };
-            const { Reviewtitle, comment, rating, time } = req.body;
-            const option = { upsert: false };
-            const updatedUser = {
-                $set: {
-                    Reviewtitle: Reviewtitle, comment: comment, rating: rating, time: time
-                }
-            }
-            const result = await reviewCollection.updateOne(filter, updatedUser, option);
-            res.send(result);
-        })
+        // app.get('/review/user/:id', jwtVerification, async (req, res) => {
+        //     const decoded = req.decoded;
+        //     const id = req.params.id;
+        //     if (decoded.uid !== id) {
+        //         return res.status(403).send({ message: 'Forbidden access !' })
+        //     }
+        //     const query = { user: id };
+        //     const result = await reviewCollection.find(query).sort({ time: -1 }).toArray();
+        //     res.send(result);
+        // });
+
+        // app.delete('/review/:id', async (req, res) => {
+        //     const id = req.params.id;
+        //     const query = { _id: ObjectId(id) }
+        //     const result = await reviewCollection.deleteOne(query);
+        //     res.send(result);
+        // });
+
+        // app.put('/review/:id', async (req, res) => {
+        //     const id = req.params.id;
+        //     const filter = { _id: ObjectId(id) };
+        //     const { Reviewtitle, comment, rating, time } = req.body;
+        //     const option = { upsert: false };
+        //     const updatedUser = {
+        //         $set: {
+        //             Reviewtitle: Reviewtitle, comment: comment, rating: rating, time: time
+        //         }
+        //     }
+        //     const result = await reviewCollection.updateOne(filter, updatedUser, option);
+        //     res.send(result);
+        // })
 
         app.post('/payment-intents', async (req, res) => {
             const price = parseFloat(req.body.price) * 100;
-            const paymentIntent = await stripe.paymentIntents.create({
-                amount: price,
-                currency: 'usd',
-                payment_method_types: ['card'],
-            });
-            res.send(paymentIntent);
+            if (price) {
+                const paymentIntent = await stripe.paymentIntents.create({
+                    amount: price,
+                    currency: 'usd',
+                    payment_method_types: ['card'],
+                });
+                res.send(paymentIntent);
+            }
         })
-        app.post('/payment', async (req, res) => {
-
-            res.send();
+        app.patch('/payment/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) };
+            const option = { upsert: false };
+            const updatedProduct = {
+                $set: {
+                    sold:true
+                }
+            }
+            const result = await carCollection.updateOne(filter, updatedProduct, option);
+            console.log(id)
+            res.send(result);
         })
         app.post('/login', async (req, res) => {
             const user = req.body?.user;
@@ -213,3 +228,7 @@ run().catch(err => console.log(err));
 app.listen(port, () => {
     console.log('node is running on ', port);
 })
+
+
+
+// { "_id": { "$oid": "637f7ed21d873ae6aef69d4e" }, "name": "Range Rover", "model": "GT-801", "milage": "50000", "date": "Nov 24, 2022", "year": "2015", "category": "suv", "sold": false, "add": false, "condition": "good", "marketPrice": "55000", "resalePrice": "40000", "image": "https://i.ibb.co/DQ8CfPq/rangerover.png", "location": "usa", "mobile": "0156203", "details": "The Rover Company (originator of the Land Rover marque) was experimenting with a larger model than the Land Rover Series in 1951, when the Rover P4-based two-wheel-drive \"Road Rover\" project was developed by Gordon Bashford.[2] This was shelved in 1958 and the idea lay dormant until 1966, when engineers Spen King and Bashford set to work on a new model.[3]", "uid": "84boNfNyDBYds1FFepO61Vh0B5A3", "sellerName": "seller1" }
