@@ -34,9 +34,10 @@ function removeDuplicate(arr2) {
 async function run() {
     try {
         const carCollection = client.db('your-car').collection('products');
-        const reviewCollection = client.db('your-car').collection('review');
+        const paymentCollection = client.db('your-car').collection('payment');
         const userCollection = client.db('your-car').collection('users');
         const orderCollection = client.db('your-car').collection('order');
+        const wishlistCollection = client.db('your-car').collection('wishlist');
         console.log('mongo db connect');
 
         function jwtVerification(req, res, next) {
@@ -96,16 +97,36 @@ async function run() {
             const products = await carCollection.find(query).toArray();
             res.send(products);
         })
-        app.get('/my-orders/:id', async (req, res) => {
-            const query = { uid: req.params.id };
-            const data = await orderCollection.find(query).toArray();
-            res.send(data);
-        });
         app.post('/order', async (req, res) => {
             const order = req.body;
             const result = await orderCollection.insertOne(order)
             res.send(result);
         });
+        app.get('/my-orders/:id', async (req, res) => {
+            const query = { uid: req.params.id };
+            const data = await orderCollection.find(query).toArray();
+            res.send(data);
+        });
+        app.post('/wishlist', async (req, res) => {
+            const item = req.body;
+            const query = { carId: item.carId }
+            const data = await wishlistCollection.findOne(query);
+            if (data) {
+                const result = await wishlistCollection.deleteOne(item);
+                res.send('Item removed from wishlist');
+            }
+            else {
+                const result = await wishlistCollection.insertOne(item);
+                res.send('Item added in wishlist');
+            }
+        });
+        app.get('/wishlist/:id', async (req, res) => {
+            const query = { uid: req.params.id };
+            const data = await wishlistCollection.find(query).toArray();
+            console.log(query)
+            res.send(data);
+        });
+
 
 
         // app.get('/services/pagination', async (req, res) => {
@@ -183,16 +204,25 @@ async function run() {
         })
         app.patch('/payment/:id', async (req, res) => {
             const id = req.params.id;
-            const filter = { _id: ObjectId(id) };
+            const payment = req.body;
+            const productFilter = { _id: ObjectId(id) };
+            const orderFilter = { carId: id };
             const option = { upsert: false };
             const updatedProduct = {
                 $set: {
-                    sold:true
+                    sold: true
                 }
             }
-            const result = await carCollection.updateOne(filter, updatedProduct, option);
-            console.log(id)
-            res.send(result);
+            const order = await orderCollection.findOne(orderFilter);
+            const paymetData = {
+                order,
+                payment
+            }
+            const productResult = await carCollection.updateOne(productFilter, updatedProduct, option);
+            const orderResult = await orderCollection.updateOne(orderFilter, updatedProduct, option);
+            const wishlistResult = await wishlistCollection.deleteOne(orderFilter);
+            const paymentResult = await paymentCollection.insertOne(paymetData);
+            res.send(productResult);
         })
         app.post('/login', async (req, res) => {
             const user = req.body?.user;
