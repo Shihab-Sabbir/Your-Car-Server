@@ -126,7 +126,31 @@ async function run() {
             console.log(query)
             res.send(data);
         });
-
+        app.post('/verify-seller/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { uid: id, verify: true }
+            const query = { uid: id }
+            const seller = await userCollection.findOne(filter);
+            console.log(id,filter,seller,query)
+            if (seller) {
+                const updateSeller = {
+                    $set: {
+                        verify: false
+                    }
+                }
+                const result = await userCollection.updateOne(query, updateSeller, { upsert: false });
+                res.send('Verification Withdwar');
+            }
+            else {
+                const updateSeller = {
+                    $set: {
+                        verify: true
+                    }
+                }
+                const result = await userCollection.updateOne(query, updateSeller, { upsert: false });
+                res.send('Seller is verified');
+            }
+        });
 
 
         // app.get('/services/pagination', async (req, res) => {
