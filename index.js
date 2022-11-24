@@ -21,6 +21,15 @@ app.get('/', (req, res) => {
 const uri = `mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PASS}@testing.wbduv4j.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
+function removeDuplicate(arr2) {
+    const seen = new Set();
+    const arr1 = arr2.filter(el => {
+        const duplicate = seen.has(el.category);
+        seen.add(el.category);
+        return !duplicate;
+    });
+    return arr1;
+}
 
 async function run() {
     try {
@@ -75,12 +84,20 @@ async function run() {
             const data = await carCollection.find(query).toArray();
             res.send(data);
         });
-        app.get('/services', async (req, res) => {
-            const query = parseInt(req.query.limit);
-            const data = carCollection.find({}).limit(query).sort({ _id: -1 });
-            const services = await data.toArray();
-            res.send(services);
+        app.get('/category', async (req, res) => {
+            const data = await carCollection.find({}).toArray();
+            const allCategory = removeDuplicate(data);
+            res.send(allCategory);
         });
+        app.get('/product/:category', async (req, res) => {
+            const category = req.params.category;
+            const query = { category: category };
+            const products = await carCollection.find(query).toArray();
+            res.send(products);
+        })
+
+
+
         app.get('/services/pagination', async (req, res) => {
             const limit = parseInt(req.query.limit);
             const page = parseInt(req.query.page);
@@ -102,12 +119,7 @@ async function run() {
             res.send({ services, length });
         });
 
-        app.get('/services/:id', async (req, res) => {
-            const id = req.params.id;
-            const query = { _id: ObjectId(id) };
-            const service = await carCollection.findOne(query);
-            res.send(service);
-        })
+
 
         app.post('/review', async (req, res) => {
             const review = req.body;
@@ -184,13 +196,13 @@ async function run() {
             const id = req.params.id;
             const query = { uid: id }
             const result = await userCollection.findOne(query);
-            console.log(result)
             res.send(result);
         });
         app.get('/users', async (req, res) => {
-            const role = req.params.role;
+            const role = req.query.role;
             const query = { role: role }
             const result = await userCollection.find(query).toArray();
+            console.log(role)
             res.send(result);
         });
     } finally {
