@@ -70,6 +70,11 @@ async function run() {
             const result = await carCollection.insertOne(product);
             res.send(result);
         })
+        app.get('/my-products/:id', async (req, res) => {
+            const query = { uid: req.params.id };
+            const data = await carCollection.find(query).toArray();
+            res.send(data);
+        });
         app.get('/services', async (req, res) => {
             const query = parseInt(req.query.limit);
             const data = carCollection.find({}).limit(query).sort({ _id: -1 });
@@ -180,6 +185,12 @@ async function run() {
             const query = { uid: id }
             const result = await userCollection.findOne(query);
             console.log(result)
+            res.send(result);
+        });
+        app.get('/users', async (req, res) => {
+            const role = req.params.role;
+            const query = { role: role }
+            const result = await userCollection.find(query).toArray();
             res.send(result);
         });
     } finally {
