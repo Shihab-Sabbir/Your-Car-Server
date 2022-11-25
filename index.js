@@ -4,6 +4,7 @@ const app = express();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 5000;
 const jwt = require('jsonwebtoken');
+const { response } = require('express');
 require('dotenv').config()
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
@@ -58,15 +59,14 @@ async function run() {
             });
         }
         async function verifyAdmin(req, res, next) {
-            const userId = req.params.uid;
+            const userId = req.decoded.uid;
             const query = { uid: userId };
             const user = await userCollection.findOne(query);
-            if (user.role === 'admin') {
-                res.status(200).send('Valid Admin');
+            if (user?.role === 'admin') {
                 return next();
             }
             else {
-                return res.status(403).send('Forbidden Access');
+                return res.status(403).send({ message: 'Forbidden Access' });
             }
         }
 
@@ -98,6 +98,17 @@ async function run() {
             const products = await carCollection.find(query).toArray();
             res.send(products);
         })
+        app.get('/product/id/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const product = await carCollection.findOne(query);
+            res.send(product.category);
+        })
+        app.get('/product/advertised/true', async (req, res) => {
+            const query = { add: true, sold: false }
+            const products = await carCollection.find(query).toArray();
+            res.send(products);
+        })
         app.post('/order', async (req, res) => {
             const order = req.body;
             const result = await orderCollection.insertOne(order)
@@ -124,7 +135,6 @@ async function run() {
         app.get('/wishlist/:id', async (req, res) => {
             const query = { uid: req.params.id };
             const data = await wishlistCollection.find(query).toArray();
-            console.log(query)
             res.send(data);
         });
         app.post('/advertise/:id', async (req, res) => {
@@ -132,7 +142,6 @@ async function run() {
             const filter = { _id: ObjectId(id), add: true }
             const query = { _id: ObjectId(id) }
             const add = await carCollection.findOne(filter);
-            console.log(id, filter, add, query)
             if (add) {
                 const updateProduct = {
                     $set: {
@@ -176,7 +185,24 @@ async function run() {
                 res.send('Seller is verified');
             }
         });
-
+        app.delete('/delete-product/:id', jwtVerification, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const result = await carCollection.deleteOne(query);
+            res.send(result);
+        })
+        app.delete('/delete-user/:id', jwtVerification, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const result = await userCollection.updateOne(query, { $set: { hidden: "true" } })
+            const userProduct = await carCollection.deleteMany({ uid: req.query.uid })
+            const orderItemForSeller = await orderCollection.deleteMany({ sellerUid: req.query.uid, sold: false })
+            const orderItemForBuyer = await orderCollection.deleteMany(query)
+            res.send(result);
+        })
+        // order, sold false, sellerUid
+        // product, uid
+        // wishlist, item > uid
 
         // app.get('/services/pagination', async (req, res) => {
         //     const limit = parseInt(req.query.limit);
@@ -273,9 +299,8 @@ async function run() {
             const paymentResult = await paymentCollection.insertOne(paymetData);
             res.send(productResult);
         })
-        app.post('/login', async (req, res) => {
+        app.post('/register', async (req, res) => {
             const user = req.body?.user;
-            console.log(user)
             const query = { uid: user?.uid }
             const isExist = await userCollection.findOne(query);
             if (isExist) {
@@ -294,7 +319,7 @@ async function run() {
         });
         app.get('/users', async (req, res) => {
             const role = req.query.role;
-            const query = { role: role }
+            const query = { role: role, hidden: { $not: { $regex: /^t.*/ } } } //hidden field does not start with t , means forst letter of t
             const result = await userCollection.find(query).toArray();
             res.send(result);
         });
