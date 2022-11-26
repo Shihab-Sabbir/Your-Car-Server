@@ -88,15 +88,22 @@ async function run() {
             res.send(data);
         });
         app.get('/category', async (req, res) => {
-            const data = await carCollection.find({}).toArray();
+            const data = await carCollection.find({ sold: false }).toArray();
             const allCategory = removeDuplicate(data);
             res.send(allCategory);
         });
         app.get('/product/:category', async (req, res) => {
             const category = req.params.category;
-            const query = { category: category };
+            const query = { categoryId: category, sold: false };
             const products = await carCollection.find(query).toArray();
+            console.log(query)
             res.send(products);
+        })
+        app.get('/single-product/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) }
+            const product = await carCollection.findOne(query);
+            res.send(product);
         })
         app.get('/product/id/:id', async (req, res) => {
             const id = req.params.id;
@@ -104,40 +111,7 @@ async function run() {
             const product = await carCollection.findOne(query);
             res.send(product.category);
         })
-        app.get('/product/advertised/true', async (req, res) => {
-            const query = { add: true, sold: false }
-            const products = await carCollection.find(query).toArray();
-            res.send(products);
-        })
-        app.post('/order', async (req, res) => {
-            const order = req.body;
-            const result = await orderCollection.insertOne(order)
-            res.send(result);
-        });
-        app.get('/my-orders/:id', async (req, res) => {
-            const query = { uid: req.params.id };
-            const data = await orderCollection.find(query).toArray();
-            res.send(data);
-        });
-        app.post('/wishlist', async (req, res) => {
-            const item = req.body;
-            const query = { carId: item.carId }
-            const data = await wishlistCollection.findOne(query);
-            if (data) {
-                const result = await wishlistCollection.deleteOne(item);
-                res.send('Item removed from wishlist');
-            }
-            else {
-                const result = await wishlistCollection.insertOne(item);
-                res.send('Item added in wishlist');
-            }
-        });
-        app.get('/wishlist/:id', async (req, res) => {
-            const query = { uid: req.params.id };
-            const data = await wishlistCollection.find(query).toArray();
-            res.send(data);
-        });
-        app.post('/advertise/:id', async (req, res) => {
+        app.post('/advertise/:id', jwtVerification, async (req, res) => {
             const id = req.params.id;
             const filter = { _id: ObjectId(id), add: true }
             const query = { _id: ObjectId(id) }
@@ -161,7 +135,53 @@ async function run() {
                 res.send('Added to advertisement');
             }
         });
-        app.post('/verify-seller/:id', async (req, res) => {
+        app.get('/product/advertised/true', async (req, res) => {
+            const query = { add: true, sold: false }
+            const products = await carCollection.find(query).toArray();
+            res.send(products);
+        })
+        app.post('/order', jwtVerification, async (req, res) => {
+            const order = req.body;
+            const query = { carId: order.carId, uid: order.uid }
+            const alreadyBooked = await orderCollection.findOne(query);
+            if (alreadyBooked) {
+                return res.status(503).send('You have already book this item !');
+            }
+            else {
+                const result = await orderCollection.insertOne(order)
+                res.send(result);
+            }
+        });
+        app.get('/my-orders/:id', jwtVerification, async (req, res) => {
+            const query = { uid: req.params.id };
+            const data = await orderCollection.find(query).toArray();
+            res.send(data);
+        });
+        app.post('/wishlist', async (req, res) => {
+            const item = req.body;
+            const query = { carId: item.carId, uid: item.uid }
+            const data = await wishlistCollection.findOne(query);
+            if (data) {
+                const result = await wishlistCollection.deleteOne(item);
+                res.send('Item removed from wishlist');
+            }
+            else {
+                const result = await wishlistCollection.insertOne(item);
+                res.send('Item added in wishlist');
+            }
+        });
+        app.delete('/wishlist/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) }
+            const result = await wishlistCollection.deleteOne(query);
+            res.send('Item removed from wishlist');
+        });
+        app.get('/wishlist/:id', async (req, res) => {
+            const query = { uid: req.params.id };
+            const data = await wishlistCollection.find(query).toArray();
+            res.send(data);
+        });
+        app.post('/verify-seller/:id', jwtVerification, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const filter = { uid: id, verify: true }
             const query = { uid: id }
@@ -277,7 +297,7 @@ async function run() {
                 res.send(paymentIntent);
             }
         })
-        app.patch('/payment/:id', async (req, res) => {
+        app.patch('/payment/:id', jwtVerification, async (req, res) => {
             const id = req.params.id;
             const payment = req.body;
             const productFilter = { _id: ObjectId(id) };
@@ -294,9 +314,23 @@ async function run() {
                 payment
             }
             const productResult = await carCollection.updateOne(productFilter, updatedProduct, option);
-            const orderResult = await orderCollection.updateOne(orderFilter, updatedProduct, option);
             const wishlistResult = await wishlistCollection.deleteOne(orderFilter);
             const paymentResult = await paymentCollection.insertOne(paymetData);
+            if (order) {
+                const orderResult = await orderCollection.updateOne(orderFilter, updatedProduct, { upsert: false });
+            }
+            else {
+                const product = await carCollection.findOne(productFilter);
+                const data = {
+                    uid: payment.uid,
+                    carId: product._id,
+                    price: product.resalePrice,
+                    productName: product.name,
+                    image: product.image,
+                    sold: true
+                }
+                const orderResult = await orderCollection.insertOne(data);
+            }
             res.send(productResult);
         })
         app.post('/register', async (req, res) => {
