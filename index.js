@@ -105,12 +105,12 @@ async function run() {
             const product = await carCollection.findOne(query);
             res.send(product);
         })
-        app.get('/product/id/:id', async (req, res) => {
-            const id = req.params.id;
-            const query = { _id: ObjectId(id) };
-            const product = await carCollection.findOne(query);
-            res.send(product.category);
-        })
+        // app.get('/product/id/:id', async (req, res) => {
+        //     const id = req.params.id;
+        //     const query = { _id: ObjectId(id) };
+        //     const product = await carCollection.findOne(query);
+        //     res.send(product.category);
+        // })
         app.post('/advertise/:id', jwtVerification, async (req, res) => {
             const id = req.params.id;
             const filter = { _id: ObjectId(id), add: true }
@@ -220,9 +220,6 @@ async function run() {
             const orderItemForBuyer = await orderCollection.deleteMany(query)
             res.send(result);
         })
-        // order, sold false, sellerUid
-        // product, uid
-        // wishlist, item > uid
 
         // app.get('/services/pagination', async (req, res) => {
         //     const limit = parseInt(req.query.limit);
@@ -233,17 +230,18 @@ async function run() {
         //     const services = await data.toArray();
         //     res.send({ services, length });
         // });
-        // app.get('/search', async (req, res) => {
-        //     const limit = parseInt(req.query.limit);
-        //     const page = parseInt(req.query.page);
-        //     const search = req.query.search;
-        //     const query = { $or: [{ description1: { $regex: search, $options: 'i' } }, { title: { $regex: search, $options: 'i' } }] };
-        //     const data = carCollection.find(query).skip(page * limit).limit(limit).sort({ _id: -1 });
-        //     const dataForLength = await carCollection.find(query).toArray();
-        //     const services = await data.toArray();
-        //     const length = dataForLength.length;
-        //     res.send({ services, length });
-        // });
+
+        app.get('/search', async (req, res) => {
+            const limit = parseInt(req.query.limit);
+            const page = parseInt(req.query.page);
+            const search = req.query.search;
+            const query = { $or: [{ title: { $regex: search, $options: 'i' } }, { model: { $regex: search, $options: 'i' } }, { details: { $regex: search, $options: 'i' } }] };
+            const data = carCollection.find(query).skip(page * limit).limit(limit);
+            const dataForLength = await carCollection.find(query).toArray();
+            const products = await data.toArray();
+            const length = dataForLength.length;
+            res.send({ products, length });
+        });
 
 
 
