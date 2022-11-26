@@ -1,36 +1,25 @@
 const express = require('express');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
 const app = express();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-const port = process.env.PORT || 5000;
-const jwt = require('jsonwebtoken');
-const { response } = require('express');
-require('dotenv').config()
-const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
+require('dotenv').config()
+
+
+const port = process.env.PORT || 5000;
+const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
 app.use(cors());
 app.use(express.json());
-
 
 app.get('/', (req, res) => {
     res.send('hello world');
 })
 
-
-
 const uri = `mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PASS}@testing.wbduv4j.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
-function removeDuplicate(arr2) {
-    const seen = new Set();
-    const arr1 = arr2.filter(el => {
-        const duplicate = seen.has(el.category);
-        seen.add(el.category);
-        return !duplicate;
-    });
-    return arr1;
-}
 
 async function run() {
     try {
@@ -62,21 +51,27 @@ async function run() {
             const userId = req.decoded.uid;
             const query = { uid: userId };
             const user = await userCollection.findOne(query);
-            if (user?.role === 'admin') {
-                return next();
+            if (user.role === 'admin') {
+                 next();
             }
             else {
                 return res.status(403).send({ message: 'Forbidden Access' });
             }
         }
-
+        function removeDuplicate(arr2) {
+            const seen = new Set();
+            const arr1 = arr2.filter(el => {
+                const duplicate = seen.has(el.category);
+                seen.add(el.category);
+                return !duplicate;
+            });
+            return arr1;
+        }
         app.post('/jwt', (req, res) => {
             const data = req.body;
             const token = jwt.sign(data, process.env.SECRET, { expiresIn: '1h' });
             res.send({ token });
         });
-
-
         app.post('/add-product', async (req, res) => {
             const product = req.body;
             const result = await carCollection.insertOne(product);
@@ -105,12 +100,6 @@ async function run() {
             const product = await carCollection.findOne(query);
             res.send(product);
         })
-        // app.get('/product/id/:id', async (req, res) => {
-        //     const id = req.params.id;
-        //     const query = { _id: ObjectId(id) };
-        //     const product = await carCollection.findOne(query);
-        //     res.send(product.category);
-        // })
         app.post('/advertise/:id', jwtVerification, async (req, res) => {
             const id = req.params.id;
             const filter = { _id: ObjectId(id), add: true }
@@ -220,17 +209,6 @@ async function run() {
             const orderItemForBuyer = await orderCollection.deleteMany(query)
             res.send(result);
         })
-
-        // app.get('/services/pagination', async (req, res) => {
-        //     const limit = parseInt(req.query.limit);
-        //     const page = parseInt(req.query.page);
-        //     const allData = await carCollection.find({}).toArray();
-        //     const length = allData.length;
-        //     const data = carCollection.find({}).skip(page * limit).limit(limit).sort({ _id: -1 });
-        //     const services = await data.toArray();
-        //     res.send({ services, length });
-        // });
-
         app.get('/search', async (req, res) => {
             const limit = parseInt(req.query.limit);
             const page = parseInt(req.query.page);
@@ -242,48 +220,6 @@ async function run() {
             const length = dataForLength.length;
             res.send({ products, length });
         });
-
-
-
-        // app.get('/review/:id', async (req, res) => {
-        //     const id = req.params.id;
-        //     const query = { serviceId: id }
-        //     const result = await reviewCollection.find(query).sort({ time: -1 }).toArray();
-        //     res.send(result);
-        // });
-
-        // app.get('/review/user/:id', jwtVerification, async (req, res) => {
-        //     const decoded = req.decoded;
-        //     const id = req.params.id;
-        //     if (decoded.uid !== id) {
-        //         return res.status(403).send({ message: 'Forbidden access !' })
-        //     }
-        //     const query = { user: id };
-        //     const result = await reviewCollection.find(query).sort({ time: -1 }).toArray();
-        //     res.send(result);
-        // });
-
-        // app.delete('/review/:id', async (req, res) => {
-        //     const id = req.params.id;
-        //     const query = { _id: ObjectId(id) }
-        //     const result = await reviewCollection.deleteOne(query);
-        //     res.send(result);
-        // });
-
-        // app.put('/review/:id', async (req, res) => {
-        //     const id = req.params.id;
-        //     const filter = { _id: ObjectId(id) };
-        //     const { Reviewtitle, comment, rating, time } = req.body;
-        //     const option = { upsert: false };
-        //     const updatedUser = {
-        //         $set: {
-        //             Reviewtitle: Reviewtitle, comment: comment, rating: rating, time: time
-        //         }
-        //     }
-        //     const result = await reviewCollection.updateOne(filter, updatedUser, option);
-        //     res.send(result);
-        // })
-
         app.post('/payment-intents', async (req, res) => {
             const price = parseFloat(req.body.price) * 100;
             if (price) {
@@ -332,8 +268,8 @@ async function run() {
             res.send(productResult);
         })
         app.post('/register', async (req, res) => {
-            const user = req.body?.user;
-            const query = { uid: user?.uid }
+            const user = req.body.user;
+            const query = { uid: user.uid }
             const isExist = await userCollection.findOne(query);
             if (isExist) {
                 return res.send('user already exists');
@@ -364,7 +300,3 @@ run().catch(err => console.log(err));
 app.listen(port, () => {
     console.log('node is running on ', port);
 })
-
-
-
-// { "_id": { "$oid": "637f7ed21d873ae6aef69d4e" }, "name": "Range Rover", "model": "GT-801", "milage": "50000", "date": "Nov 24, 2022", "year": "2015", "category": "suv", "sold": false, "add": false, "condition": "good", "marketPrice": "55000", "resalePrice": "40000", "image": "https://i.ibb.co/DQ8CfPq/rangerover.png", "location": "usa", "mobile": "0156203", "details": "The Rover Company (originator of the Land Rover marque) was experimenting with a larger model than the Land Rover Series in 1951, when the Rover P4-based two-wheel-drive \"Road Rover\" project was developed by Gordon Bashford.[2] This was shelved in 1958 and the idea lay dormant until 1966, when engineers Spen King and Bashford set to work on a new model.[3]", "uid": "84boNfNyDBYds1FFepO61Vh0B5A3", "sellerName": "seller1" }
