@@ -28,11 +28,13 @@ async function run() {
         const userCollection = client.db('your-car').collection('users');
         const orderCollection = client.db('your-car').collection('order');
         const wishlistCollection = client.db('your-car').collection('wishlist');
+        const reviewCollection = client.db('your-car').collection('review');
 
         console.log('mongo db connect');
 
         function jwtVerification(req, res, next) {
             const authHeaders = req.headers.authorization;
+            console.log('authHeaders : ', authHeaders);
             if (!authHeaders) {
                 return res.status(401).send({ message: 'unauthorized access !' })
             }
@@ -95,9 +97,19 @@ async function run() {
             const allCategory = removeDuplicate(data);
             res.send(allCategory);
         });
+        app.get('/all-products', async (req, res) => {
+            const limit = parseInt(req.query.limit);
+            const page = parseInt(req.query.page);
+            const query = { sold: false, display: { $ne: false } }
+            const allData = await carCollection.find(query).toArray();
+            const length = allData.length;
+            const data = carCollection.find(query).skip(page * limit).limit(limit).sort({ _id: -1 });
+            const products = await data.toArray();
+            res.send({ products, length });
+        });
         app.get('/product/:category', async (req, res) => {
             const category = req.params.category;
-            const query = { categoryId: category, sold: false };
+            const query = { categoryId: category, sold: false, display: { $ne: false } };
             const products = await carCollection.find(query).toArray();
             console.log(query)
             res.send(products);
@@ -154,6 +166,22 @@ async function run() {
             const data = await orderCollection.find(query).toArray();
             res.send(data);
         });
+        app.patch('/report/:id', jwtVerification, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) }
+            const result = await carCollection.updateOne(query, { $set: { report: true } });
+            res.send(result)
+        })
+        app.patch('/remove-report/:id', jwtVerification, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) }
+            const result = await carCollection.updateOne(query, { $set: { report: false } });
+            res.send(result)
+        })
+        app.get('/all-report', jwtVerification, verifyAdmin, async (req, res) => {
+            const result = await carCollection.find({ report: true }).toArray();
+            res.send(result)
+        })
         app.post('/wishlist', async (req, res) => {
             const item = req.body;
             const query = { carId: item.carId, uid: item.uid }
@@ -206,6 +234,7 @@ async function run() {
             const id = req.params.id;
             const query = { _id: ObjectId(id) };
             const result = await carCollection.deleteOne(query);
+            console.log(result, query)
             res.send(result);
         })
         app.delete('/delete-order/:id', jwtVerification, async (req, res) => {
@@ -217,10 +246,9 @@ async function run() {
         app.delete('/delete-user/:id', jwtVerification, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const query = { _id: ObjectId(id) };
+            const carQuery = { uid: req.query.uid }
             const result = await userCollection.updateOne(query, { $set: { hidden: true } })
-            // const userProduct = await carCollection.deleteMany({ uid: req.query.uid })
-            // const orderItemForSeller = await orderCollection.deleteMany({ sellerUid: req.query.uid, sold: false })
-            // const orderItemForBuyer = await orderCollection.deleteMany(query)
+            const userProduct = await carCollection.updateOne(carQuery, { $set: { add: false, display: false } })
             res.send(result);
         })
         app.get('/search', async (req, res) => {
@@ -233,6 +261,19 @@ async function run() {
             const products = await data.toArray();
             const length = dataForLength.length;
             res.send({ products, length });
+        });
+
+        app.post('/review', async (req, res) => {
+            const review = req.body;
+            const result = await reviewCollection.insertOne(review)
+            res.send(result);
+        });
+
+        app.get('/review/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { serviceId: id }
+            const result = await reviewCollection.find(query).sort({ time: -1 }).toArray();
+            res.send(result);
         });
         app.post('/payment-intents', async (req, res) => {
             const price = parseFloat(req.body.price) * 100;
@@ -253,7 +294,10 @@ async function run() {
             const option = { upsert: false };
             const updatedProduct = {
                 $set: {
-                    sold: true
+                    sold: true,
+                    payBy: payment.uid,
+                    txId: payment.txId,
+                    date: payment.date
                 }
             }
             const order = await orderCollection.findOne(orderFilter);
@@ -265,7 +309,8 @@ async function run() {
             const wishlistResult = await wishlistCollection.deleteOne(orderFilter);
             const paymentResult = await paymentCollection.insertOne(paymetData);
             if (order) {
-                const orderResult = await orderCollection.updateOne(orderFilter, updatedProduct, { upsert: false });
+                const orderResult = await orderCollection.updateOne(orderFilter, updatedProduct, option);
+                console.log(orderResult, orderFilter, updatedProduct, option)
             }
             else {
                 const product = await carCollection.findOne(productFilter);
@@ -299,7 +344,7 @@ async function run() {
             const result = await userCollection.findOne(query);
             res.send(result);
         });
-        app.get('/users', async (req, res) => {
+        app.get('/users', jwtVerification, verifyAdmin, async (req, res) => {
             const role = req.query.role;
             const query = { role: role, hidden: { $ne: true } } //hidden field does not start with t , means forst letter of t
             const result = await userCollection.find(query).toArray();
