@@ -14,7 +14,7 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/', (req, res) => {
-    res.send('hello world');
+    res.send('Wellcome to Your Car server');
 })
 
 const uri = `mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PASS}@testing.wbduv4j.mongodb.net/?retryWrites=true&w=majority`;
@@ -52,7 +52,7 @@ async function run() {
             const query = { uid: userId };
             const user = await userCollection.findOne(query);
             if (user.role === 'admin') {
-                 next();
+                next();
             }
             else {
                 return res.status(403).send({ message: 'Forbidden Access' });
@@ -67,10 +67,18 @@ async function run() {
             });
             return arr1;
         }
-        app.post('/jwt', (req, res) => {
+
+        app.post('/jwt', async (req, res) => {
             const data = req.body;
-            const token = jwt.sign(data, process.env.SECRET, { expiresIn: '1h' });
-            res.send({ token });
+            const uid = data.uid;
+            const isBlocked = await userCollection.findOne({ uid: uid, hidden: true });
+            if (isBlocked !== null) {
+                res.status(403).send('Due to violation of terms and condition , your id is blocked !')
+            }
+            else {
+                const token = jwt.sign(data, process.env.SECRET, { expiresIn: '1h' });
+                res.send({ token });
+            }
         });
         app.post('/add-product', async (req, res) => {
             const product = req.body;
@@ -200,13 +208,19 @@ async function run() {
             const result = await carCollection.deleteOne(query);
             res.send(result);
         })
+        app.delete('/delete-order/:id', jwtVerification, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const result = await orderCollection.deleteOne(query);
+            res.send(result);
+        })
         app.delete('/delete-user/:id', jwtVerification, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const query = { _id: ObjectId(id) };
-            const result = await userCollection.updateOne(query, { $set: { hidden: "true" } })
-            const userProduct = await carCollection.deleteMany({ uid: req.query.uid })
-            const orderItemForSeller = await orderCollection.deleteMany({ sellerUid: req.query.uid, sold: false })
-            const orderItemForBuyer = await orderCollection.deleteMany(query)
+            const result = await userCollection.updateOne(query, { $set: { hidden: true } })
+            // const userProduct = await carCollection.deleteMany({ uid: req.query.uid })
+            // const orderItemForSeller = await orderCollection.deleteMany({ sellerUid: req.query.uid, sold: false })
+            // const orderItemForBuyer = await orderCollection.deleteMany(query)
             res.send(result);
         })
         app.get('/search', async (req, res) => {
@@ -287,7 +301,7 @@ async function run() {
         });
         app.get('/users', async (req, res) => {
             const role = req.query.role;
-            const query = { role: role, hidden: { $not: { $regex: /^t.*/ } } } //hidden field does not start with t , means forst letter of t
+            const query = { role: role, hidden: { $ne: true } } //hidden field does not start with t , means forst letter of t
             const result = await userCollection.find(query).toArray();
             res.send(result);
         });
