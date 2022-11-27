@@ -213,7 +213,7 @@ async function run() {
             const limit = parseInt(req.query.limit);
             const page = parseInt(req.query.page);
             const search = req.query.search;
-            const query = { $or: [{ title: { $regex: search, $options: 'i' } }, { model: { $regex: search, $options: 'i' } }, { details: { $regex: search, $options: 'i' } }] };
+            const query = { $or: [{ name: { $regex: search, $options: 'i' } }, { model: { $regex: search, $options: 'i' } }, { details: { $regex: search, $options: 'i' } }] };
             const data = carCollection.find(query).skip(page * limit).limit(limit);
             const dataForLength = await carCollection.find(query).toArray();
             const products = await data.toArray();
