@@ -309,8 +309,7 @@ async function run() {
             const wishlistResult = await wishlistCollection.deleteOne(orderFilter);
             const paymentResult = await paymentCollection.insertOne(paymetData);
             if (order) {
-                const orderResult = await orderCollection.updateOne(orderFilter, updatedProduct, option);
-                console.log(orderResult, orderFilter, updatedProduct, option)
+                const orderResult = await orderCollection.updateMany(orderFilter, updatedProduct);
             }
             else {
                 const product = await carCollection.findOne(productFilter);
@@ -320,6 +319,9 @@ async function run() {
                     price: product.resalePrice,
                     productName: product.name,
                     image: product.image,
+                    payBy: payment.uid,
+                    txId: payment.txId,
+                    date: payment.date,
                     sold: true
                 }
                 const orderResult = await orderCollection.insertOne(data);
